@@ -2,28 +2,35 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Joel</title>
+  <title>Movie Trailer Ad</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <style type="text/css">
-    html,
-    body {
-      background: transparent;
+  <style>
+    html, body {
       margin: 0;
       padding: 0;
       font-family: sans-serif;
+      background: transparent;
     }
 
     #overlay-container {
       width: 960px;
       height: 540px;
+      position: relative;
     }
 
-    /* Your style here... (feel free to remove this example styling) */
+    #instruction {
+      font-size: 16px;
+      margin-bottom: 16px;
+      color: #333;
+      font-weight: 600;
+      text-align: left;
+    }
+
     #skip {
-      display: none; /* Hidden until ad starts */
+      display: none;
       position: absolute;
-      bottom: 60px;
+      bottom: 30px;
       right: 0;
       padding: 10px 18px;
       background: rgba(0, 0, 0, 0.6);
@@ -33,49 +40,277 @@
       border-radius: 4px 0 0 4px;
       color: white;
       cursor: pointer;
+      transition: opacity 0.3s;
+    }
+
+    #skip.disabled {
+      opacity: 0.4;
+      pointer-events: none;
+    }
+
+    #dialog-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #dialog {
+      background: white;
+      padding: 24px;
+      border-radius: 8px;
+      width: 360px;
+    }
+
+    .question {
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    .answer {
+      width: 100%;
+      margin-bottom: 14px;
+      padding: 6px;
+    }
+
+    #submit-btn {
+      width: 100%;
+      padding: 10px;
+      background: #1a73e8;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    #submit-btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    #message {
+      margin-top: 10px;
+      font-size: 13px;
+      min-height: 18px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* Toast */
+    #toast {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(220, 0, 0, 0.9);
+      color: white;
+      padding: 10px 16px;
+      border-radius: 4px;
+      font-size: 14px;
+      opacity: 0;
+      transition: opacity 0.4s;
+      pointer-events: none;
+    }
+
+    #toast.show {
+      opacity: 1;
     }
   </style>
 </head>
 
 <body>
   <div id="overlay-container">
-    <!-- We've added a sample button. Feel free to remove it: -->
-    <button id="skip">
-      Skip Ad...
-    </button>
+    <button id="skip">Skip Ad</button>
+    <div id="toast" class="hidden"></div>
   </div>
 
-  <script type="text/javascript">
+  <div id="dialog-overlay" class="hidden">
+    <div id="dialog">
+    <div id="instruction">
+        We need to verify that you saw and understood the ad.
+    </div>
+
+    <div id="questions-container"></div>
+    <button id="submit-btn" disabled>Submit</button>
+    <div id="message"></div>
+    </div>
+  </div>
+
+  <script>
     (function(window, document){
-      // This is how you tell the parent window that the ad was successfully skipped.
+
       function adSuccess() {
         window.top.postMessage({ type: 'success' }, '*');
       }
 
-      const skipButton = document.getElementById('skip');
+      function sendToParent(msg) {
+        window.top.postMessage(msg, '*');
+      }
 
-      // Listen for messages from the game shell
+      function pauseAd() {
+        sendToParent({ type: 'pause' });
+      }
+
+      function resumeAd() {
+        sendToParent({ type: 'play' });
+      }
+
+      const COUNTDOWN_SECONDS = 30;       // Amount of time to wait between skip attempts, as well as initial wait time
+      const TOAST_DURATION_MS = 2000;    // Skip Failure notification duration
+
+      /**
+        If you want to repurpose this skip functionality for all videos, you may need to make the questions more general purpose.
+      */
+      const ALL_QUESTIONS = { // encode solution so its not easily visible in source file in browser.
+        "What is the name of the movie being shown?": s => btoa(s.toLowerCase()) == "YWdlbnQgYnV0dGVyZmx5",
+        "Who is the main character in this movie?": s => btoa(s.toLowerCase()) == "YWdlbnQgYnV0dGVyZmx5",
+        "What kind of oil is the thief stealing at the start of the trailer?": s => ["bW9vbg==", "bW9vbiBvaWw="].includes(btoa(s.toLowerCase())),
+        "Who is the villain in this movie?": s => ["am9leSBiLg==", "am9leSBi"].includes(btoa(s.toLowerCase())),
+        "The Oracle is also known as the Queen of _____. Fill in the blank.": s => btoa(s.toLowerCase()) == "YmVhbnM=",
+        "What is the name of the agent's organization in this movie?": s => ["Y3Jvd3Bybw==","Y3Jvdy1wcm8=","Y3JvdyBwcm8="].includes(btoa(s.toLowerCase())),
+        "What kind of island does The Oracle reside on?": s => ["ZmxvYXRpbmc=", "Zmx5aW5n", "YSBmbG9hdGluZyBpc2xhbmQ=", "ZmxvYXRpbmcgaXNsYW5k", "Zmx5aW5nIGlzbGFuZA==", "c2t5IGlzbGFuZA==", "YSBmbHlpbmcgaXNsYW5k", "YSBza3kgaXNsYW5k"].includes(btoa(s.toLowerCase())),
+        "What enemies does the agent encounter in the space station?": s => ["cm9ib3Rz", "cm9ib3Q="].includes(btoa(s.toLowerCase())),
+        "What does the agent open in the fantastical mansion?": s => ["YSBjaGVzdA==", "Y2hlc3Q=", "dHJlYXN1cmU=", "dHJlYXN1cmUgY2hlc3Q=", "YSB0cmVhc3VyZSBjaGVzdA=="].includes(btoa(s.toLowerCase())),
+        "What happens to the agent after being hit by the rock?": s => {
+                low = s.toLowerCase();
+                lowArr = low.replace(/[^a-z ]/g, "").split(" ").map(s => btoa(s));
+                return (lowArr.includes("ZmxpZXM=") || lowArr.includes("ZmFsbHM=")) && (lowArr.includes("b3Ji") || lowArr.includes("YmFsbA==") || lowArr.includes("cG9ydGFs"));
+            }
+      }
+
+      const skipButton = document.getElementById('skip');
+      const dialogOverlay = document.getElementById('dialog-overlay');
+      const questionsContainer = document.getElementById('questions-container');
+      const submitBtn = document.getElementById('submit-btn');
+      const messageEl = document.getElementById('message');
+      const toastEl = document.getElementById('toast');
+
+      let countdownInterval = null;
+      let currentQuestions = [];
+
+      function getRandomQuestions(list, count) {
+        return [...list].sort(() => 0.5 - Math.random()).slice(0, count);
+      }
+
+      function renderQuestions() {
+        questionsContainer.innerHTML = '';
+        currentQuestions = getRandomQuestions(Object.keys(ALL_QUESTIONS), 3);
+
+        currentQuestions.forEach((q) => {
+          const qEl = document.createElement('div');
+          qEl.className = 'question';
+          qEl.textContent = q;
+
+          const input = document.createElement('input');
+          input.className = 'answer';
+          input.type = 'text';
+
+          input.addEventListener('input', checkFilled);
+
+          questionsContainer.appendChild(qEl);
+          questionsContainer.appendChild(input);
+        });
+      }
+
+      function checkFilled() {
+        const inputs = document.querySelectorAll('.answer');
+        submitBtn.disabled = !Array.from(inputs).every(i => i.value.trim());
+      }
+
+      function checkAnswers(answers) {
+        return answers.reduce((acc, entry, i) => acc && ALL_QUESTIONS[currentQuestions[i]](entry),true)
+      }
+
+      function startCountdown() {
+        let remaining = COUNTDOWN_SECONDS;
+
+        skipButton.classList.add('disabled');
+
+        if (countdownInterval) {
+          clearInterval(countdownInterval);
+        }
+
+        // immediate update
+        skipButton.textContent = `Skip Ad in ${remaining}`;
+
+        countdownInterval = setInterval(() => {
+          remaining--;
+
+          if (remaining < 0) {
+            clearInterval(countdownInterval);
+            countdownInterval = null;
+            skipButton.textContent = 'Skip Ad ▶|';
+            skipButton.classList.remove('disabled');
+          } else {
+            skipButton.textContent = `Skip Ad in ${remaining}`;
+          }
+        }, 1000);
+      }
+
+      function showToast(message) {
+        toastEl.textContent = message;
+        toastEl.classList.remove('hidden');
+
+        requestAnimationFrame(() => {
+          toastEl.classList.add('show');
+        });
+
+        setTimeout(() => {
+          toastEl.classList.remove('show');
+
+          setTimeout(() => {
+            toastEl.classList.add('hidden');
+          }, 400);
+        }, TOAST_DURATION_MS);
+      }
+
+      function closeDialogWithFailure() {
+        dialogOverlay.classList.add('hidden');
+        resumeAd();
+        showToast('Incorrect answers. Try again shortly.');
+        startCountdown();
+      }
+
       window.addEventListener('message', (event) => {
         if (!event.data || !event.data.type) return;
 
         if (event.data.type === 'adStarted') {
-          // Show the skip button when the ad starts
           skipButton.style.display = 'block';
+          startCountdown(); // start immediately
         }
 
-        // By default, if the user doesn't "skip" the ad before the video ends,
-        // we call fail to restart. You're welcome to replace this with a survey
-        // or other interaction instead (see examples/survey).
         if (event.data.type === 'adFinished') {
           skipButton.style.display = 'none';
           window.top.postMessage({ type: 'fail' }, '*');
         }
       });
 
-      // Your ad overlay code goes here, we've added a simple example below:
       skipButton.addEventListener('click', () => {
-        skipButton.style.display = 'none';
-        adSuccess();
+        renderQuestions();
+
+        // reset state
+        messageEl.textContent = '';
+        submitBtn.disabled = true;
+
+        dialogOverlay.classList.remove('hidden');
+        pauseAd();
+      });
+
+      submitBtn.addEventListener('click', () => {
+        const answers = Array.from(document.querySelectorAll('.answer')).map(i => i.value);
+
+        if (checkAnswers(answers)) {
+          messageEl.style.color = 'green';
+          messageEl.textContent = 'Thanks!';
+          submitBtn.disabled = true;
+          setTimeout(() => adSuccess(), 800);
+        } else {
+          closeDialogWithFailure();
+        }
       });
 
     })(window, document);
