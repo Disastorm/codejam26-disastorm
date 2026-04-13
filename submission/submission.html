@@ -13,11 +13,10 @@
       background: transparent;
     }
 
-    #overlay-container {
-      width: 960px;
-      height: 540px;
-      position: relative;
-    }
+	#overlay-container {
+	  position: absolute;
+	  inset: 0;
+	}
 
     #instruction {
       font-size: 16px;
@@ -28,20 +27,20 @@
     }
 
     #skip {
-      display: none;
-      position: absolute;
-      bottom: 30px;
-      right: 0;
-      padding: 10px 18px;
-      background: rgba(0, 0, 0, 0.6);
-      border: 1px solid black;
-      border-right-width: 0;
-      font-size: 1.2rem;
-      border-radius: 4px 0 0 4px;
-      color: white;
-      cursor: pointer;
-      transition: opacity 0.3s;
-    }
+	  display: none;
+	  position: absolute;
+	  bottom: clamp(8px, 6%, 30px);       /* shrinks bottom offset with container */
+	  right: 0;
+	  padding: clamp(4px, 1.5%, 10px) clamp(6px, 2%, 18px);  /* shrinks padding */
+	  background: rgba(0, 0, 0, 0.6);
+	  border: 1px solid black;
+	  border-right-width: 0;
+	  font-size: clamp(0.65rem, 2vw, 1.2rem);  /* shrinks font with viewport width */
+	  border-radius: 4px 0 0 4px;
+	  color: white;
+	  cursor: pointer;
+	  transition: opacity 0.3s;
+	}
 
     #skip.disabled {
       opacity: 0.4;
@@ -49,7 +48,7 @@
     }
 
     #dialog-overlay {
-      position: fixed;
+      position: absolute;
       inset: 0;
       background: rgba(0,0,0,0.5);
       display: flex;
@@ -58,16 +57,31 @@
     }
 
     #dialog {
-      background: white;
-      padding: 24px;
-      border-radius: 8px;
-      width: 360px;
-    }
+	  background: white;
+	  padding: 16px;
+	  border-radius: 8px;
+
+	  width: 90%;
+	  max-width: 460px;
+
+	  max-height: 90%;
+	  display: flex;
+	  flex-direction: column;
+
+	  box-sizing: border-box;
+	}
 
     .question {
       margin-bottom: 8px;
       font-size: 14px;
     }
+	
+	#questions-container {
+	  overflow-y: auto;
+	  flex: 1;
+	  padding-right: 18px
+	}
+
 
     .answer {
       width: 100%;
@@ -95,7 +109,7 @@
       font-size: 13px;
       min-height: 18px;
     }
-
+	
     .hidden {
       display: none !important;
     }
@@ -119,6 +133,7 @@
     #toast.show {
       opacity: 1;
     }
+	
   </style>
 </head>
 
